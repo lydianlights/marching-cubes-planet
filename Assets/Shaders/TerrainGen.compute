@@ -1,0 +1,49 @@
+#pragma kernel TerrainGen
+#include "Assets/Shaders/Shared/NoiseGen.cginc"
+
+static const int THREADS_PER_GROUP = 8;
+
+RWStructuredBuffer<float4> points;
+int pointsPerAxis;
+float voxelSize;
+float3 chunkWorldPosition;
+
+float planetRadius;
+float3 offset;
+float amplitude;
+float freqency;
+int octaves;
+float lacunarity;
+float gain;
+
+int indexFromCoords(int x, int y, int z) {
+  return z * pointsPerAxis * pointsPerAxis + x * pointsPerAxis + y;
+}
+
+float4 evalTerrain(float3 localPosition) {
+  float3 globalPosition = localPosition + chunkWorldPosition;
+  float n = octaveSnoise(
+    globalPosition,
+    offset,
+    amplitude,
+    freqency,
+    octaves,
+    lacunarity,
+    gain
+  );
+  // float n = snoise(globalPosition);
+  float base = length(globalPosition) - planetRadius;
+  float val = base + n;
+  return float4(localPosition, val);
+}
+
+[numthreads(THREADS_PER_GROUP, THREADS_PER_GROUP, THREADS_PER_GROUP)]
+void TerrainGen (uint3 id : SV_DispatchThreadID) {
+  if (int(id.x) >= pointsPerAxis || int(id.y) >= pointsPerAxis || int(id.z) >= pointsPerAxis) {
+    return;
+  }
+
+  int index = indexFromCoords(id.x, id.y, id.z);
+  float3 localPosition = voxelSize * id;
+  points[index] = evalTerrain(localPosition);
+}

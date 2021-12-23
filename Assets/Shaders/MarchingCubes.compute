@@ -1,0 +1,80 @@
+#pragma kernel MarchingCubes
+#include "Assets/Shaders/Shared/MarchingCubesTables.cginc"
+
+static const int THREADS_PER_GROUP = 8;
+
+struct Triangle {
+  float3 a;
+  float3 b;
+  float3 c;
+};
+
+RWStructuredBuffer<float4> points;
+AppendStructuredBuffer<Triangle> triangles;
+int pointsPerAxis;
+
+int indexFromCoords(int x, int y, int z) {
+  return z * pointsPerAxis * pointsPerAxis + x * pointsPerAxis + y;
+}
+
+float3 interpolateVertices(float4 v1, float4 v2) {
+  float t = v1.w / (v1.w - v2.w);
+  return v1.xyz + t * (v2.xyz - v1.xyz);
+}
+
+// float3 interpolateVertices(float4 v1, float4 v2) {
+//   return v1.xyz + 0.5 * (v2.xyz - v1.xyz);
+// }
+
+[numthreads(THREADS_PER_GROUP, THREADS_PER_GROUP, THREADS_PER_GROUP)]
+void MarchingCubes (uint3 id : SV_DispatchThreadID) {
+  int voxelsPerAxis = pointsPerAxis - 1;
+  if (int(id.x) >= voxelsPerAxis || int(id.y) >= voxelsPerAxis || int(id.z) >= voxelsPerAxis) {
+    return;
+  }
+
+  // Sdf values for cube corners
+  float4 cubeCorners[8] = {
+    points[indexFromCoords(id.x, id.y, id.z)],
+    points[indexFromCoords(id.x + 1, id.y, id.z)],
+    points[indexFromCoords(id.x + 1, id.y, id.z + 1)],
+    points[indexFromCoords(id.x, id.y, id.z + 1)],
+    points[indexFromCoords(id.x, id.y + 1, id.z)],
+    points[indexFromCoords(id.x + 1, id.y + 1, id.z)],
+    points[indexFromCoords(id.x + 1, id.y + 1, id.z + 1)],
+    points[indexFromCoords(id.x, id.y + 1, id.z + 1)]
+  };
+
+  // Map values to cube configuration index
+  // 0 == completely inside, 0xff == completely outside
+  int cubeIndex = 0;
+  if (cubeCorners[0].w <= 0) cubeIndex |= 0x01;
+  if (cubeCorners[1].w <= 0) cubeIndex |= 0x02;
+  if (cubeCorners[2].w <= 0) cubeIndex |= 0x04;
+  if (cubeCorners[3].w <= 0) cubeIndex |= 0x08;
+  if (cubeCorners[4].w <= 0) cubeIndex |= 0x10;
+  if (cubeCorners[5].w <= 0) cubeIndex |= 0x20;
+  if (cubeCorners[6].w <= 0) cubeIndex |= 0x40;
+  if (cubeCorners[7].w <= 0) cubeIndex |= 0x80;
+
+  // Get tris for cube index
+  for (int i = 0; i < 5; i++) {
+    int edgeA = triangulationTable[cubeIndex][3 * i];
+    int edgeB = triangulationTable[cubeIndex][3 * i + 1];
+    int edgeC = triangulationTable[cubeIndex][3 * i + 2];
+
+    if (edgeA == -1) {
+      break;
+    }
+
+    int vertsA[2] = edgeVertexTable[edgeA];
+    int vertsB[2] = edgeVertexTable[edgeB];
+    int vertsC[2] = edgeVertexTable[edgeC];
+
+    Triangle tri;
+    tri.a = interpolateVertices(cubeCorners[vertsA[0]], cubeCorners[vertsA[1]]);
+    tri.b = interpolateVertices(cubeCorners[vertsB[0]], cubeCorners[vertsB[1]]);
+    tri.c = interpolateVertices(cubeCorners[vertsC[0]], cubeCorners[vertsC[1]]);
+    triangles.Append(tri);
+  }
+}
