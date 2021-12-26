@@ -4,26 +4,22 @@ using UnityEngine;
 
 public class Planet : MonoBehaviour {
   [Header("Params")]
-  public float radius = 25f;
+  public float radius = 1000f;
+  public float seaLevel = 1000f;
   public Vector3 offset = new Vector3(69f, 420f, 1337f);
-  public float amplitude = 1f;
-  public float freqency = 1f;
-  public int octaves = 4;
-  public float lacunarity = 1.5f;
+  public float amplitude = 1.5f;
+  public float freqency = 0.06f;
+  public int octaves = 6;
+  public float lacunarity = 1.7f;
   public float gain = 0.8f;
 
   [Header("Editor")]
   public bool drawPlanetRadius = true;
   public bool drawChunkBorders = false;
-  public float chunkGenerationRadius = 32f;
-  public int lod = 1;
-  
-  [Header("Misc")]
-  public ChunkManager chunkManager;
 
-  void Awake() {
-
-  }
+  [Header("LOD")]
+  public PlanetTerrainManager terrainManager;
+  public Transform lodTarget;
 
 
   // ====== EDITOR ====== //
@@ -36,8 +32,7 @@ public class Planet : MonoBehaviour {
   }
 
   public void EDITOR_OnRegeneratePressed() {
-    Awake();
-    chunkManager.EDITOR_Regenerate();
+    terrainManager.EDITOR_Regenerate();
   }
   #endif
 }

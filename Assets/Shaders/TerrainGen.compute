@@ -6,9 +6,10 @@ static const int THREADS_PER_GROUP = 8;
 RWStructuredBuffer<float4> points;
 int pointsPerAxis;
 float voxelSize;
-float3 chunkWorldPosition;
+float3 chunkPosition;
 
 float planetRadius;
+float seaLevel;
 float3 offset;
 float amplitude;
 float freqency;
@@ -21,8 +22,9 @@ int indexFromCoords(int x, int y, int z) {
 }
 
 float4 evalTerrain(float3 localPosition) {
-  float3 globalPosition = localPosition + chunkWorldPosition;
-  float n = octaveSnoise(
+  float3 globalPosition = localPosition + chunkPosition;
+
+  float terrainNoise = octaveSnoise(
     globalPosition,
     offset,
     amplitude,
@@ -31,9 +33,13 @@ float4 evalTerrain(float3 localPosition) {
     lacunarity,
     gain
   );
-  // float n = snoise(globalPosition);
-  float base = length(globalPosition) - planetRadius;
-  float val = base + n;
+  float baseLevel = length(globalPosition) - planetRadius;
+  float val = baseLevel + terrainNoise;
+
+  float baseSeaLevel = length(globalPosition) - seaLevel;
+
+  val = min(val, baseSeaLevel);
+
   return float4(localPosition, val);
 }
 
